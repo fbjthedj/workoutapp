@@ -808,4 +808,5 @@ elif page == "📊 Progress Analytics":
 elif page == "📅 Workout History":
     show_workout_history()
 
+
     
