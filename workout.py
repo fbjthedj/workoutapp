@@ -130,8 +130,11 @@ def load_workout_history():
     return []
 
 def save_workout_history(history):
-    with open(WORKOUT_HISTORY_FILE, 'w') as f:
-        json.dump(history, f, indent=2)
+    try:
+        with open(WORKOUT_HISTORY_FILE, 'w') as f:
+            json.dump(history, f, indent=2)
+    except Exception as e:
+        st.error(f"Could not save workout history: {e}")
 
 def load_current_workout_data():
     if os.path.exists(WORKOUT_DATA_FILE):
@@ -143,8 +146,11 @@ def load_current_workout_data():
     return {'tuesday': {}, 'thursday': {}}
 
 def save_current_workout_data(data):
-    with open(WORKOUT_DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+    try:
+        with open(WORKOUT_DATA_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        st.error(f"Could not save workout data: {e}")
 
 # Load data on startup
 if not st.session_state.workout_history:
@@ -246,7 +252,7 @@ workouts = {
                 'sets': 3,
                 'reps': "12",
                 'notes': "Control movement",
-                'category': "accessory"
+                'category': "strength"
             },
             {
                 'id': 12,
@@ -254,7 +260,7 @@ workouts = {
                 'sets': 3,
                 'reps': "12",
                 'notes': "Focus on hip drive",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 13,
@@ -262,7 +268,7 @@ workouts = {
                 'sets': 3,
                 'reps': "8",
                 'notes': "Keep core tight",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 14,
@@ -295,6 +301,54 @@ workouts = {
                 'reps': "30-45 sec each",
                 'notes': "Low lunge or 90/90 hip stretch",
                 'category': "cooldown"
+            },
+            {
+                'id': 18,
+                'name': "Goblet March",
+                'sets': 3,
+                'reps': "30-60 sec",
+                'notes': "Hold KB at chest, drive knees up, maintain posture",
+                'category': "accessory"
+            },
+            {
+                'id': 19,
+                'name': "Single Arm Rack March or Carry",
+                'sets': 3,
+                'reps': "30-60 sec each side",
+                'notes': "Stabilize through the torso, keep KB upright",
+                'category': "accessory"
+            },
+            {
+                'id': 20,
+                'name': "Single Arm Overhead March",
+                'sets': 3,
+                'reps': "30-45 sec each side",
+                'notes': "If shoulder mobility allows; strict overhead control",
+                'category': "accessory"
+            },
+            {
+                'id': 21,
+                'name': "Kettlebell Oblique Side Bends",
+                'sets': 3,
+                'reps': "10 each side",
+                'notes': "Deep side bend, then strong contraction on the way up",
+                'category': "accessory"
+            },
+            {
+                'id': 22,
+                'name': "Reverse Crunches (Kettlebell Anchor)",
+                'sets': 3,
+                'reps': "10",
+                'notes': "Slow tempo, roll up from spine, core-controlled",
+                'category': "accessory"
+            },
+            {
+                'id': 23,
+                'name': "Russian Twists (with KB)",
+                'sets': 3,
+                'reps': "20 total reps (slow)",
+                'notes': "Focus on upper-body rotation, controlled movement",
+                'category': "accessory"
             }
         ]
     },
@@ -728,13 +782,12 @@ if page == "🏋️ Current Workout":
     with col2:
         if st.button("🔄 Reset", help="Reset all sets for this workout"):
             reset_workout(selected_day)
-            st.rerun()
+            st.success("Workout reset!")
     with col3:
         if completed_sets == total_sets and total_sets > 0:
             if st.button("✅ Complete", help="Save workout to history"):
                 if complete_workout(selected_day):
                     st.success("Workout saved to history!")
-                    st.rerun()
     
     # Completion message
     if completed_sets == total_sets and total_sets > 0:
@@ -798,7 +851,6 @@ if page == "🏋️ Current Workout":
                         use_container_width=True
                     ):
                         toggle_set(selected_day, exercise_id, set_index)
-                        st.rerun()
             
             st.markdown("---")
 
@@ -807,6 +859,5 @@ elif page == "📊 Progress Analytics":
 
 elif page == "📅 Workout History":
     show_workout_history()
-
 
     
