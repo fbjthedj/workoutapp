@@ -279,30 +279,6 @@ workouts = {
                 'category': "accessory"
             },
             {
-                'id': 15,
-                'name': "Hamstring stretch",
-                'sets': 1,
-                'reps': "30-45 sec each",
-                'notes': "Standing forward fold or seated reach",
-                'category': "cooldown"
-            },
-            {
-                'id': 16,
-                'name': "Quad stretch",
-                'sets': 1,
-                'reps': "30-45 sec each",
-                'notes': "Standing quad pull or couch stretch",
-                'category': "cooldown"
-            },
-            {
-                'id': 17,
-                'name': "Hip flexor stretch",
-                'sets': 1,
-                'reps': "30-45 sec each",
-                'notes': "Low lunge or 90/90 hip stretch",
-                'category': "cooldown"
-            },
-            {
                 'id': 18,
                 'name': "Goblet March",
                 'sets': 3,
@@ -349,6 +325,29 @@ workouts = {
                 'reps': "20 total reps (slow)",
                 'notes': "Focus on upper-body rotation, controlled movement",
                 'category': "accessory"
+            },{
+                'id': 15,
+                'name': "Hamstring stretch",
+                'sets': 1,
+                'reps': "30-45 sec each",
+                'notes': "Standing forward fold or seated reach",
+                'category': "cooldown"
+            },
+            {
+                'id': 16,
+                'name': "Quad stretch",
+                'sets': 1,
+                'reps': "30-45 sec each",
+                'notes': "Standing quad pull or couch stretch",
+                'category': "cooldown"
+            },
+            {
+                'id': 17,
+                'name': "Hip flexor stretch",
+                'sets': 1,
+                'reps': "30-45 sec each",
+                'notes': "Low lunge or 90/90 hip stretch",
+                'category': "cooldown"
             }
         ]
     },
