@@ -276,7 +276,7 @@ workouts = {
                 'sets': 3,
                 'reps': "20 taps",
                 'notes': "Stability-focused",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 18,
@@ -284,7 +284,7 @@ workouts = {
                 'sets': 3,
                 'reps': "30-60 sec",
                 'notes': "Hold KB at chest, drive knees up, maintain posture",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 19,
@@ -292,7 +292,7 @@ workouts = {
                 'sets': 3,
                 'reps': "30-60 sec each side",
                 'notes': "Stabilize through the torso, keep KB upright",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 20,
@@ -300,7 +300,7 @@ workouts = {
                 'sets': 3,
                 'reps': "30-45 sec each side",
                 'notes': "If shoulder mobility allows; strict overhead control",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 21,
@@ -308,7 +308,7 @@ workouts = {
                 'sets': 3,
                 'reps': "10 each side",
                 'notes': "Deep side bend, then strong contraction on the way up",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 22,
@@ -316,7 +316,7 @@ workouts = {
                 'sets': 3,
                 'reps': "10",
                 'notes': "Slow tempo, roll up from spine, core-controlled",
-                'category': "accessory"
+                'category': "core"
             },
             {
                 'id': 23,
@@ -324,7 +324,7 @@ workouts = {
                 'sets': 3,
                 'reps': "20 total reps (slow)",
                 'notes': "Focus on upper-body rotation, controlled movement",
-                'category': "accessory"
+                'category': "core"
             },{
                 'id': 15,
                 'name': "Hamstring stretch",
