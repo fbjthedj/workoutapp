@@ -686,9 +686,3 @@ with settings_tab:
             safe_toast("Cleared today's sets.")
 
     st.caption("Schema v3 – per‑set weight & RPE logging, metadata, PRs, elapsed timer, auto‑rest, and polished UI.")
-
-
-
-
-
-    
