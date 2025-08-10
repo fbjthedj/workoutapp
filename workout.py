@@ -91,24 +91,30 @@ def ui_toggle(label: str, value: bool):
     return st.checkbox(label, value=value)
 
 # =============================================================
-# Global styles (light/dark aware)
+# Global styles (light/dark + generous spacing)
 # =============================================================
 st.markdown(
     """
     <style>
-      :root { --radius: 14px; --muted:#64748b; }
-      .main-title { text-align:center; margin: 0.6rem 0 0.2rem 0; }
-      .sub-title { text-align:center; color:var(--muted); margin-bottom:0.4rem; }
-      .tiny { color:var(--muted); font-size:12px; text-align:center; }
-      
-      /* Buttons: large, thumb-friendly */
-      .stButton>button { width: 100%; padding: 14px 16px; border-radius: var(--radius); font-weight: 700; }
-      .chip-row { display:flex; gap:8px; flex-wrap: wrap; }
-      .chip { flex:1 1 90px; min-width:90px; border:1px solid #E5E7EB; padding: 10px 12px; border-radius: 9999px; text-align:center; cursor:pointer; background:#fff; }
-      .chip.done { background:#DCFCE7; border-color:#86EFAC; }
+      :root { --radius: 16px; --muted:#64748b; --space-1:6px; --space-2:10px; --space-3:16px; --space-4:24px; --card:#ffffff; --line:#E5E7EB; }
 
-      .ex-card { background:#fff; border:1.5px solid #E5E7EB; border-radius: var(--radius); padding:14px; }
-      .ex-card.done { border-color:#10B981; background: #F0FDF4; }
+      /* Page gutters */
+      .block-container { max-width: 880px !important; padding-top: var(--space-4) !important; padding-bottom: var(--space-4) !important; }
+      .main-title { text-align:center; margin: var(--space-3) 0 var(--space-1) 0; line-height: 1.15; }
+      .sub-title { text-align:center; color:var(--muted); margin-bottom: var(--space-3); }
+      .tiny { color:var(--muted); font-size:12px; text-align:center; }
+      .section-head { margin: var(--space-4) 0 var(--space-2); font-weight: 800; font-size: 1.05rem; letter-spacing: .2px; }
+
+      /* Tabs spacing */
+      .stTabs [role="tablist"] { gap: 8px; margin-bottom: var(--space-3); }
+      .stTabs [role="tab"] { padding: 8px 12px; border-radius: 9999px; }
+
+      /* Buttons: large, thumb-friendly with breathing room */
+      .stButton>button { width: 100%; padding: 14px 16px; border-radius: var(--radius); font-weight: 700; margin: 6px 0; }
+
+      /* Cards */
+      .ex-card { background: var(--card); border:1.5px solid var(--line); border-radius: var(--radius); padding:18px 16px; margin-bottom: var(--space-3); box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
+      .ex-card.done { border-color:#10B981; background: #F0FDF4; box-shadow: 0 8px 24px rgba(16,185,129,0.12); }
       .badge { display:inline-block; padding:4px 10px; border-radius:9999px; font-size:12px; font-weight:700; margin-left:8px; }
       .warmup { background:#FFEAD5; color:#9A3412; }
       .strength { background:#FEE2E2; color:#991B1B; }
@@ -118,14 +124,21 @@ st.markdown(
       .cooldown { background:#DCFCE7; color:#166534; }
       .pr { background:#FEF9C3; color:#854D0E; border:1px solid #FDE68A; }
 
-      .sticky-bar { position: sticky; bottom: 8px; z-index: 50; background: rgba(255,255,255,0.92); backdrop-filter: blur(6px); border:1px solid #E5E7EB; padding:10px; border-radius: var(--radius); display:flex; gap:10px; }
+      /* Sticky actions */
+      .sticky-wrap { margin-top: var(--space-4); }
+      .sticky-bar { position: sticky; bottom: 10px; z-index: 50; background: rgba(255,255,255,0.96); backdrop-filter: blur(8px); border:1px solid var(--line); padding:12px; border-radius: var(--radius); display:flex; gap:12px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+
+      /* Dense components breathing room */
+      .stNumberInput input, .stTextInput input { border-radius: 12px; padding: 8px 10px; }
+
+      /* Expanders spacing */
+      details { margin-top: var(--space-2); }
 
       @media (prefers-color-scheme: dark) {
-        .ex-card { background:#0B1220; border-color:#263041; }
-        .ex-card.done { background:#0f1b12; border-color:#14532d; }
-        .chip { background:#0B1220; border-color:#263041; }
-        .chip.done { background:#0f1b12; border-color:#14532d; }
-        .sticky-bar { background: rgba(9,13,22,0.85); border-color:#263041; }
+        :root { --card:#0B1220; --line:#263041; }
+        .ex-card { background:var(--card); border-color:var(--line); box-shadow: 0 8px 22px rgba(0,0,0,0.35); }
+        .ex-card.done { background:#0f1b12; border-color:#14532d; box-shadow: 0 8px 24px rgba(16,185,129,0.18); }
+        .sticky-bar { background: rgba(9,13,22,0.92); border-color:var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
       }
     </style>
     """,
@@ -437,7 +450,7 @@ with main_tab:
     # Render blocks
     name_map = {}  # ex_key -> exercise display name for metadata
     for b_i, block in enumerate(WORKOUT_TEMPLATES[day]["blocks"]):
-        st.subheader(block["name"])  # clean sectional headings
+        st.markdown(f"<div class='section-head'>{block['name']}</div>", unsafe_allow_html=True)
         for i_i, it in enumerate(block["items"]):
             k = ex_key_from(b_i, i_i)
             name_map[k] = it["name"]
@@ -454,12 +467,12 @@ with main_tab:
             with ui_container_border():
                 st.markdown(
                     f"<div class='ex-card {'done' if is_done else ''}'>"
-                    f"<div style='display:flex; align-items:center; justify-content:space-between;'>"
-                    f"<div><strong>{'✅' if is_done else '⭕'} {it['name']}</strong>"
+                    f"<div style='display:flex; align-items:center; justify-content:space-between; gap:10px;'>"
+                    f"<div style='min-width:60%;'><strong>{'✅' if is_done else '⭕'} {it['name']}</strong>"
                     f"<span class='badge {it['cat']}'>{it['cat']}</span>{pr_html}</div>"
-                    f"<div style='font-size:12px; color:#64748b;'>{it['reps']}</div>"
+                    f"<div style='font-size:12px; color:#64748b; text-align:right;'>{it['reps']}</div>"
                     f"</div>"
-                    f"<div style='color:#64748b; margin:6px 0 10px 0;'>{it.get('note','')}</div>"
+                    f"<div style='color:#64748b; margin:8px 0 12px 0;'>{it.get('note','')}</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -520,10 +533,11 @@ with main_tab:
                             )
                             set_set_detail(day, k, s, "rpe", r if r > 0 else None)
 
-                st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     # Sticky Actions bar
     with st.container():
+        st.markdown("<div class='sticky-wrap'></div>", unsafe_allow_html=True)
         st.markdown("<div class='sticky-bar'>", unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
         with c1:
@@ -577,7 +591,7 @@ with main_tab:
 # Analytics tab
 # =============================================================
 with analytics_tab:
-    st.subheader("Weekly Output")
+    st.markdown("<div class='section-head'>Weekly Output</div>", unsafe_allow_html=True)
     if len(st.session_state.history) == 0:
         st.info("Complete and save a workout to see analytics.")
     else:
@@ -594,14 +608,14 @@ with analytics_tab:
         fig.update_layout(barmode="group", title="Completed Sets per Week", xaxis_title="ISO Week", yaxis_title="Sets")
         st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("Completion % over Time")
+        st.markdown("<div class='section-head'>Completion % over Time</div>", unsafe_allow_html=True)
         comp = df.sort_values("date")
         fig2 = go.Figure(go.Scatter(x=comp["date"], y=comp["completion_percentage"], mode="lines+markers"))
         fig2.update_layout(yaxis_title="Completion %", xaxis_title="Date")
         st.plotly_chart(fig2, use_container_width=True)
 
         # PR table (simple)
-        st.subheader("Personal Records (by Load)")
+        st.markdown("<div class='section-head'>Personal Records (by Load)</div>", unsafe_allow_html=True)
         prs_rows = sorted([(k, v) for k, v in PRS.items()], key=lambda x: x[0])
         if prs_rows:
             st.dataframe(pd.DataFrame(prs_rows, columns=["Exercise", "Max Load (kg)"]), use_container_width=True, hide_index=True)
@@ -612,7 +626,7 @@ with analytics_tab:
 # History tab
 # =============================================================
 with history_tab:
-    st.subheader("Recent Workouts")
+    st.markdown("<div class='section-head'>Recent Workouts</div>", unsafe_allow_html=True)
     if len(st.session_state.history) == 0:
         st.info("No history yet.")
     else:
@@ -630,7 +644,6 @@ with history_tab:
                     st.json(item.get("data", {}))
             with c2:
                 if st.button("Duplicate as Today", key=f"dup_{item['date']}"):
-                    name_map_prev = item.get("meta", {}).get("name_map", {})
                     prefill = {}
                     for ex_key, sets_map in item.get("data", {}).items():
                         prefill[ex_key] = {s: {"done": False, "weight": None, "reps": None, "rpe": None} for s in sets_map.keys()}
@@ -642,7 +655,7 @@ with history_tab:
 # Settings tab
 # =============================================================
 with settings_tab:
-    st.subheader("Preferences")
+    st.markdown("<div class='section-head'>Preferences</div>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         st.session_state.auto_rest = st.number_input("Auto‑rest after set (seconds)", min_value=0, max_value=300, value=int(st.session_state.auto_rest), step=15)
@@ -651,7 +664,7 @@ with settings_tab:
         st.session_state.confetti_on_save = ui_toggle("🎉 Confetti on save", value=bool(st.session_state.confetti_on_save))
 
     st.divider()
-    st.subheader("Data")
+    st.markdown("<div class='section-head'>Data</div>", unsafe_allow_html=True)
     cA, cB, cC = st.columns(3)
     with cA:
         st.download_button(
@@ -673,6 +686,7 @@ with settings_tab:
             safe_toast("Cleared today's sets.")
 
     st.caption("Schema v3 – per‑set weight & RPE logging, metadata, PRs, elapsed timer, auto‑rest, and polished UI.")
+
 
 
 
