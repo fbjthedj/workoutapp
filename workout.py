@@ -1,862 +1,477 @@
 import streamlit as st
 import json
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, date
+from datetime import datetime, timedelta
 import os
 
-# Page configuration
+# --------------------------
+# Page config (mobile-first)
+# --------------------------
 st.set_page_config(
-    page_title="Workout Tracker",
-    page_icon="💪",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="10K Speed – Strength Tracker",
+    page_icon="🏃‍♂️",
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for better styling
-st.markdown("""
-<style>
-    .main-header {
-        text-align: center;
-        padding: 1rem 0;
-        margin-bottom: 2rem;
-    }
-    
-    .workout-card {
-        background: white;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        transition: all 0.3s ease;
-    }
-    
-    .workout-card-completed {
-        background: #f0fdf4;
-        border-color: #bbf7d0;
-    }
-    
-    .exercise-header {
-        font-weight: 600;
-        font-size: 1.1rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    .exercise-details {
-        color: #6b7280;
-        font-size: 0.9rem;
-        margin-bottom: 1rem;
-    }
-    
-    .category-badge {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 500;
-        margin-bottom: 0.5rem;
-    }
-    
-    .warm-up { background: #fed7aa; color: #9a3412; }
-    .strength { background: #fecaca; color: #991b1b; }
-    .power { background: #e9d5ff; color: #7c2d92; }
-    .accessory { background: #bfdbfe; color: #1e40af; }
-    .cooldown { background: #bbf7d0; color: #166534; }
-    
-    .progress-container {
-        background: #f1f5f9;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 1rem 0;
-        text-align: center;
-    }
-    
-    .completion-message {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-        padding: 2rem;
-        border-radius: 12px;
-        text-align: center;
-        margin: 2rem 0;
-    }
-    
-    .metric-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        padding: 1rem;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    
-    .workout-history-item {
-        background: white;
-        border-left: 4px solid #3b82f6;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-radius: 0 8px 8px 0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-</style>
-""", unsafe_allow_html=True)
+# --------------------------
+# Global constants & files
+# --------------------------
+DATA_DIR = "."
+WORKOUT_DATA_FILE = os.path.join(DATA_DIR, "workout_data.json")
+WORKOUT_HISTORY_FILE = os.path.join(DATA_DIR, "workout_history.json")
+SCHEMA_VERSION = 2
 
-# File paths for data persistence
-WORKOUT_DATA_FILE = "workout_data.json"
-WORKOUT_HISTORY_FILE = "workout_history.json"
+# --------------------------
+# Styles – touch-friendly
+# --------------------------
+st.markdown(
+    """
+    <style>
+      :root { --radius: 14px; }
+      .main-title { text-align:center; margin: 0.6rem 0 0.2rem 0; }
+      .sub-title { text-align:center; color:#5b6573; margin-bottom:0.8rem; }
 
-# Initialize session state
-if 'workout_data' not in st.session_state:
-    st.session_state.workout_data = {
-        'tuesday': {},
-        'thursday': {}
-    }
+      /* Make buttons large and easy to tap */
+      .stButton>button { width: 100%; padding: 14px 16px; border-radius: var(--radius); font-weight: 600; }
+      .chip-row { display:flex; gap:8px; flex-wrap: wrap; }
+      .chip { flex: 1 1 80px; min-width: 80px; border:1px solid #E5E7EB; padding: 10px 12px; border-radius: 9999px; text-align:center; cursor:pointer; background:#fff; }
+      .chip.done { background:#DCFCE7; border-color:#86EFAC; }
 
-if 'selected_day' not in st.session_state:
-    st.session_state.selected_day = 'tuesday'
+      .ex-card { background:#fff; border:1.5px solid #E5E7EB; border-radius: var(--radius); padding:14px; }
+      .ex-card.done { border-color:#10B981; background: #F0FDF4; }
+      .badge { display:inline-block; padding:4px 10px; border-radius:9999px; font-size:12px; font-weight:600; margin-left:8px; }
+      .warmup { background:#FFEAD5; color:#9A3412; }
+      .strength { background:#FEE2E2; color:#991B1B; }
+      .power { background:#EDE9FE; color:#6D28D9; }
+      .core { background:#DBEAFE; color:#1E40AF; }
+      .accessory { background:#F1F5F9; color:#0F172A; }
+      .cooldown { background:#DCFCE7; color:#166534; }
 
-if 'workout_history' not in st.session_state:
-    st.session_state.workout_history = []
+      .sticky-bar { position: sticky; bottom: 6px; z-index: 100; background: rgba(255,255,255,0.9); backdrop-filter: blur(6px); border:1px solid #E5E7EB; padding:10px; border-radius: var(--radius); display:flex; gap:10px; }
 
-# Load data functions
+      @media (prefers-color-scheme: dark) {
+        .ex-card { background:#0B1220; border-color:#263041; }
+        .ex-card.done { background:#0f1b12; border-color:#14532d; }
+        .chip { background:#0B1220; border-color:#263041; }
+        .chip.done { background:#0f1b12; border-color:#14532d; }
+        .sticky-bar { background: rgba(9,13,22,0.85); border-color:#263041; }
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --------------------------
+# Utilities – load/save/migrate
+# --------------------------
 @st.cache_data
-def load_workout_history():
-    if os.path.exists(WORKOUT_HISTORY_FILE):
+def load_json(path, fallback):
+    if os.path.exists(path):
         try:
-            with open(WORKOUT_HISTORY_FILE, 'r') as f:
+            with open(path, "r") as f:
                 return json.load(f)
-        except:
-            return []
-    return []
+        except Exception:
+            return fallback
+    return fallback
 
-def save_workout_history(history):
+
+def save_json(path, data):
     try:
-        with open(WORKOUT_HISTORY_FILE, 'w') as f:
-            json.dump(history, f, indent=2)
-    except Exception as e:
-        st.error(f"Could not save workout history: {e}")
-
-def load_current_workout_data():
-    if os.path.exists(WORKOUT_DATA_FILE):
-        try:
-            with open(WORKOUT_DATA_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            return {'tuesday': {}, 'thursday': {}}
-    return {'tuesday': {}, 'thursday': {}}
-
-def save_current_workout_data(data):
-    try:
-        with open(WORKOUT_DATA_FILE, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f, indent=2)
     except Exception as e:
-        st.error(f"Could not save workout data: {e}")
+        st.error(f"Could not save to {path}: {e}")
 
-# Load data on startup
-if not st.session_state.workout_history:
-    st.session_state.workout_history = load_workout_history()
 
-if not any(st.session_state.workout_data.values()):
-    st.session_state.workout_data = load_current_workout_data()
-
-# Workout data
-workouts = {
-    'tuesday': {
-        'title': "Full-body Strength & Power",
-        'day': "Tuesday",
-        'color': "🔵",
-        'exercises': [
+# Workout templates – tuned for sub-45 10K (strength + power)
+# Rep ranges emphasize max strength (3–6), speed-strength, and ankle stiffness.
+WORKOUT_TEMPLATES = {
+    "tuesday": {
+        "title": "Max Strength + Plyo",
+        "emoji": "🔵",
+        "blocks": [
             {
-                'id': 1,
-                'name': "Jump-rope warm-up (1/4-lb rope)",
-                'sets': 1,
-                'reps': "3 min",
-                'notes': "Light, quick foot contacts",
-                'category': "warm-up"
+                "name": "Warm-up",
+                "items": [
+                    {"name": "Jump rope – quick contacts (¼ lb)", "sets": 1, "reps": "2–3 min", "cat": "warmup", "note": "Light, bouncy. Nose-breath if possible."},
+                    {"name": "Leg swings + inchworms", "sets": 1, "reps": "10/dir + 6", "cat": "warmup", "note": "Open hips, prime hamstrings."},
+                    {"name": "Ankle pogos", "sets": 2, "reps": "20s", "cat": "power", "note": "Stiff ankles, quick cycles."},
+                ],
             },
             {
-                'id': 2,
-                'name': "Leg swings",
-                'sets': 1,
-                'reps': "10 each",
-                'notes': "Dynamic leg swings forward/back and side to side",
-                'category': "warm-up"
+                "name": "Strength A",
+                "items": [
+                    {"name": "Goblet squat (DB 22.5kg / KB 24kg)", "sets": 5, "reps": "3–5", "cat": "strength", "note": "2–3 min rest. RPE 8–9."},
+                    {"name": "Romanian deadlift (2×15kg)", "sets": 4, "reps": "5–6", "cat": "strength", "note": "Hinge hard. 2 min rest."},
+                    {"name": "Standing calf raise (load as able)", "sets": 4, "reps": "8–10 @ 2-1-2", "cat": "accessory", "note": "Tempo: 2s up, 1s hold, 2s down."},
+                ],
             },
             {
-                'id': 3,
-                'name': "Lunges",
-                'sets': 1,
-                'reps': "10 each",
-                'notes': "Dynamic walking lunges or reverse lunges",
-                'category': "warm-up"
+                "name": "Power",
+                "items": [
+                    {"name": "Box/step jumps (mid-shin)", "sets": 4, "reps": "3–4", "cat": "power", "note": "Full reset. Max intent."},
+                    {"name": "KB swings (24kg)", "sets": 3, "reps": "8–10", "cat": "power", "note": "Explosive hips. 90s rest."},
+                ],
             },
             {
-                'id': 4,
-                'name': "Kettlebell halos (12 kg)",
-                'sets': 1,
-                'reps': "10 each",
-                'notes': "Slow controlled circles around head",
-                'category': "warm-up"
+                "name": "Core / Anti-extension",
+                "items": [
+                    {"name": "Ab wheel rollouts", "sets": 3, "reps": "6–10", "cat": "core", "note": "Tight ribs–pelvis."},
+                    {"name": "Side plank", "sets": 3, "reps": "30–45s/side", "cat": "core", "note": "Long line, no sag."},
+                ],
             },
             {
-                'id': 5,
-                'name': "Goblet squats (dumbbell 22.5 kg or KB 24 kg)",
-                'sets': 4,
-                'reps': "8",
-                'notes': "Heavy strength; 2 min rest",
-                'category': "strength"
+                "name": "Cooldown",
+                "items": [
+                    {"name": "Hamstring + hip flexor stretch", "sets": 1, "reps": "45–60s", "cat": "cooldown", "note": "Easy breathing."},
+                ],
             },
-            {
-                'id': 6,
-                'name': "Romanian deadlifts (two 15 kg DBs)",
-                'sets': 4,
-                'reps': "8",
-                'notes': "Neutral spine, hinge at hips",
-                'category': "strength"
-            },
-            {
-                'id': 7,
-                'name': "Single-arm DB push press",
-                'sets': 4,
-                'reps': "8",
-                'notes': "Alternate arms, explosive drive",
-                'category': "strength"
-            },
-            {
-                'id': 8,
-                'name': "Kettlebell swings (24 kg)",
-                'sets': 3,
-                'reps': "12",
-                'notes': "Power; 90 s rest",
-                'category': "power"
-            },
-            {
-                'id': 9,
-                'name': "Jump-rope double-unders / high-speed singles",
-                'sets': 3,
-                'reps': "30 s",
-                'notes': "Use heavier ½-lb rope",
-                'category': "power"
-            },
-            {
-                'id': 10,
-                'name': "Box/step jumps",
-                'sets': 3,
-                'reps': "6",
-                'notes': "Mid-shin height, soft landings",
-                'category': "power"
-            },
-            {
-                'id': 11,
-                'name': "Bent-over row (12.5 kg DBs)",
-                'sets': 3,
-                'reps': "12",
-                'notes': "Control movement",
-                'category': "strength"
-            },
-            {
-                'id': 12,
-                'name': "Single-leg glute bridge",
-                'sets': 3,
-                'reps': "12",
-                'notes': "Focus on hip drive",
-                'category': "core"
-            },
-            {
-                'id': 13,
-                'name': "Ab-roller roll-outs",
-                'sets': 3,
-                'reps': "8",
-                'notes': "Keep core tight",
-                'category': "core"
-            },
-            {
-                'id': 14,
-                'name': "Plank with shoulder taps",
-                'sets': 3,
-                'reps': "20 taps",
-                'notes': "Stability-focused",
-                'category': "core"
-            },
-            {
-                'id': 18,
-                'name': "Goblet March",
-                'sets': 3,
-                'reps': "30-60 sec",
-                'notes': "Hold KB at chest, drive knees up, maintain posture",
-                'category': "core"
-            },
-            {
-                'id': 19,
-                'name': "Single Arm Rack March or Carry",
-                'sets': 3,
-                'reps': "30-60 sec each side",
-                'notes': "Stabilize through the torso, keep KB upright",
-                'category': "core"
-            },
-            {
-                'id': 20,
-                'name': "Single Arm Overhead March",
-                'sets': 3,
-                'reps': "30-45 sec each side",
-                'notes': "If shoulder mobility allows; strict overhead control",
-                'category': "core"
-            },
-            {
-                'id': 21,
-                'name': "Kettlebell Oblique Side Bends",
-                'sets': 3,
-                'reps': "10 each side",
-                'notes': "Deep side bend, then strong contraction on the way up",
-                'category': "core"
-            },
-            {
-                'id': 22,
-                'name': "Reverse Crunches (Kettlebell Anchor)",
-                'sets': 3,
-                'reps': "10",
-                'notes': "Slow tempo, roll up from spine, core-controlled",
-                'category': "core"
-            },
-            {
-                'id': 23,
-                'name': "Russian Twists (with KB)",
-                'sets': 3,
-                'reps': "20 total reps (slow)",
-                'notes': "Focus on upper-body rotation, controlled movement",
-                'category': "core"
-            },{
-                'id': 15,
-                'name': "Hamstring stretch",
-                'sets': 1,
-                'reps': "30-45 sec each",
-                'notes': "Standing forward fold or seated reach",
-                'category': "cooldown"
-            },
-            {
-                'id': 16,
-                'name': "Quad stretch",
-                'sets': 1,
-                'reps': "30-45 sec each",
-                'notes': "Standing quad pull or couch stretch",
-                'category': "cooldown"
-            },
-            {
-                'id': 17,
-                'name': "Hip flexor stretch",
-                'sets': 1,
-                'reps': "30-45 sec each",
-                'notes': "Low lunge or 90/90 hip stretch",
-                'category': "cooldown"
-            }
-        ]
+        ],
     },
-    'thursday': {
-        'title': "Unilateral Strength & Stability",
-        'day': "Thursday",
-        'color': "🟢",
-        'exercises': [
+    "thursday": {
+        "title": "Unilateral Strength + Elastic Power",
+        "emoji": "🟢",
+        "blocks": [
             {
-                'id': 1,
-                'name': "Jump-rope warm-up / light jog",
-                'sets': 1,
-                'reps': "3 min",
-                'notes': "Prepare joints and heart rate",
-                'category': "warm-up"
+                "name": "Warm-up",
+                "items": [
+                    {"name": "Light jog or rope", "sets": 1, "reps": "2–3 min", "cat": "warmup", "note": "Heat up joints."},
+                    {"name": "Deep lunges + hip openers", "sets": 1, "reps": "8/leg + 8/side", "cat": "warmup", "note": "Find end range."},
+                ],
             },
             {
-                'id': 2,
-                'name': "Deep lunges",
-                'sets': 1,
-                'reps': "8 each",
-                'notes': "Deep static lunges with hip opener focus",
-                'category': "warm-up"
+                "name": "Strength B (unilateral)",
+                "items": [
+                    {"name": "Bulgarian split squat (15kg)", "sets": 4, "reps": "6/leg", "cat": "strength", "note": "2–3 min rest."},
+                    {"name": "Single-leg RDL (12.5–15kg)", "sets": 3, "reps": "6/leg", "cat": "strength", "note": "Own the balance."},
+                    {"name": "1-arm DB row (22.5kg)", "sets": 3, "reps": "6–8/arm", "cat": "strength", "note": "Stable torso."},
+                ],
             },
             {
-                'id': 3,
-                'name': "Hip openers",
-                'sets': 1,
-                'reps': "8 each",
-                'notes': "Dynamic hip circles and 90/90 transitions",
-                'category': "warm-up"
+                "name": "Power / Elastic",
+                "items": [
+                    {"name": "Lateral bounds to stick", "sets": 3, "reps": "5–6/side", "cat": "power", "note": "Hold 2s on landing."},
+                    {"name": "Jump-rope high-knee sprints", "sets": 4, "reps": "20–30s", "cat": "power", "note": "Pop off the ground."},
+                ],
             },
             {
-                'id': 4,
-                'name': "Inchworms",
-                'sets': 1,
-                'reps': "8",
-                'notes': "Walk hands out to plank, walk back up",
-                'category': "warm-up"
+                "name": "Carries + Anti-rotation",
+                "items": [
+                    {"name": "Farmer carry heavy (KB 24kg + DB 22.5kg)", "sets": 3, "reps": "30–40m", "cat": "accessory", "note": "Tall. Don’t sway."},
+                    {"name": "Suitcase carry (24kg)", "sets": 2, "reps": "20–30m/side", "cat": "accessory", "note": "Resist side-bend."},
+                ],
             },
             {
-                'id': 5,
-                'name': "Bulgarian split squat (15 kg DB)",
-                'sets': 4,
-                'reps': "8",
-                'notes': "Each leg; goblet position",
-                'category': "strength"
+                "name": "Core / Rotation",
+                "items": [
+                    {"name": "Russian twists (load light/mod)", "sets": 3, "reps": "10–12/side", "cat": "core", "note": "Rotate ribs, not elbows."},
+                    {"name": "Bird-dog slow", "sets": 2, "reps": "8/side", "cat": "core", "note": "3s hold."},
+                ],
             },
             {
-                'id': 6,
-                'name': "Single-arm DB row (22.5 kg)",
-                'sets': 4,
-                'reps': "8",
-                'notes': "Support with opposite hand",
-                'category': "strength"
+                "name": "Cooldown",
+                "items": [
+                    {"name": "Calf + T-spine + hip flexor", "sets": 1, "reps": "45–60s/each", "cat": "cooldown", "note": "Downshift."},
+                ],
             },
-            {
-                'id': 7,
-                'name': "Floor or KB chest press (12 kg KBs)",
-                'sets': 4,
-                'reps': "8",
-                'notes': "Control the lowering phase",
-                'category': "strength"
-            },
-            {
-                'id': 8,
-                'name': "Kettlebell clean & push press",
-                'sets': 3,
-                'reps': "8",
-                'notes': "Moderate weight; alternate arms",
-                'category': "power"
-            },
-            {
-                'id': 9,
-                'name': "Lateral bounds to single-leg hold",
-                'sets': 3,
-                'reps': "8",
-                'notes': "Hold landing 2 s each bound",
-                'category': "power"
-            },
-            {
-                'id': 10,
-                'name': "Jump-rope high-knee sprints",
-                'sets': 3,
-                'reps': "30 s",
-                'notes': "Emphasise knee lift",
-                'category': "power"
-            },
-            {
-                'id': 11,
-                'name': "Russian twist (12.5 kg DB)",
-                'sets': 3,
-                'reps': "12",
-                'notes': "Rotational core strength",
-                'category': "accessory"
-            },
-            {
-                'id': 12,
-                'name': "Suitcase carry (24 kg KB)",
-                'sets': 3,
-                'reps': "20 m",
-                'notes': "Carry per side; stay upright",
-                'category': "accessory"
-            },
-            {
-                'id': 13,
-                'name': "Bird-dog",
-                'sets': 3,
-                'reps': "10/side",
-                'notes': "Slow, controlled",
-                'category': "accessory"
-            },
-            {
-                'id': 14,
-                'name': "Hamstring stretch",
-                'sets': 1,
-                'reps': "45-60 sec each",
-                'notes': "Standing forward fold or seated reach",
-                'category': "cooldown"
-            },
-            {
-                'id': 15,
-                'name': "Calf stretch",
-                'sets': 1,
-                'reps': "45-60 sec each",
-                'notes': "Wall push or downward dog focus",
-                'category': "cooldown"
-            },
-            {
-                'id': 16,
-                'name': "Hip flexor stretch",
-                'sets': 1,
-                'reps': "45-60 sec each",
-                'notes': "Low lunge or couch stretch",
-                'category': "cooldown"
-            },
-            {
-                'id': 17,
-                'name': "Thoracic spine stretch",
-                'sets': 1,
-                'reps': "45-60 sec",
-                'notes': "Cat-cow or thoracic extension over foam roller",
-                'category': "cooldown"
-            }
-        ]
-    }
+        ],
+    },
 }
 
-def get_category_class(category):
-    return category.replace('-', '')
+# --------------------------
+# Session state
+# --------------------------
+if "schema" not in st.session_state:
+    st.session_state.schema = SCHEMA_VERSION
+if "workout_data" not in st.session_state:
+    st.session_state.workout_data = load_json(WORKOUT_DATA_FILE, {"_schema": SCHEMA_VERSION, "tuesday": {}, "thursday": {}})
+if "history" not in st.session_state:
+    st.session_state.history = load_json(WORKOUT_HISTORY_FILE, [])
+if "selected_day" not in st.session_state:
+    st.session_state.selected_day = "tuesday"
+if "rest_timer_end" not in st.session_state:
+    st.session_state.rest_timer_end = None
 
-def calculate_progress(day):
-    current_workout = workouts[day]
-    total_sets = sum(exercise['sets'] for exercise in current_workout['exercises'])
-    
-    completed_sets = 0
-    for exercise_id, sets_data in st.session_state.workout_data[day].items():
-        if isinstance(sets_data, dict):
-            completed_sets += sum(1 for completed in sets_data.values() if completed)
-    
-    return completed_sets, total_sets
+# --------------------------
+# Data migration v1 -> v2
+# --------------------------
+# v2 stores per-set dict: {done:bool, weight:float|None, reps:int|str, rpe:float|None}
 
-def toggle_set(day, exercise_id, set_index):
-    if day not in st.session_state.workout_data:
-        st.session_state.workout_data[day] = {}
-    if exercise_id not in st.session_state.workout_data[day]:
-        st.session_state.workout_data[day][exercise_id] = {}
-    
-    current_state = st.session_state.workout_data[day][exercise_id].get(set_index, False)
-    st.session_state.workout_data[day][exercise_id][set_index] = not current_state
-    
-    # Save current workout data
-    save_current_workout_data(st.session_state.workout_data)
+def migrate_to_v2(data):
+    if isinstance(data, dict) and data.get("_schema") == SCHEMA_VERSION:
+        return data
 
-def reset_workout(day):
-    st.session_state.workout_data[day] = {}
-    save_current_workout_data(st.session_state.workout_data)
+    migrated = {"_schema": SCHEMA_VERSION, "tuesday": {}, "thursday": {}}
+    for day in ("tuesday", "thursday"):
+        day_data = (data or {}).get(day, {})
+        new_day = {}
+        for ex_key, sets_map in day_data.items():
+            new_day[ex_key] = {}
+            for idx, val in sets_map.items():
+                done = bool(val) if isinstance(val, (bool, int)) else False
+                new_day[ex_key][str(idx)] = {"done": done, "weight": None, "reps": None, "rpe": None}
+        migrated[day] = new_day
+    return migrated
 
-def is_set_completed(day, exercise_id, set_index):
-    return st.session_state.workout_data[day].get(exercise_id, {}).get(set_index, False)
+st.session_state.workout_data = migrate_to_v2(st.session_state.workout_data)
 
-def get_exercise_completed_sets(day, exercise_id):
-    exercise_sets = st.session_state.workout_data[day].get(exercise_id, {})
-    return sum(1 for completed in exercise_sets.values() if completed)
+# --------------------------
+# Helpers
+# --------------------------
 
-def complete_workout(day):
-    """Save completed workout to history and reset current workout"""
-    completed_sets, total_sets = calculate_progress(day)
-    
-    if completed_sets == total_sets and total_sets > 0:
-        workout_entry = {
-            'date': datetime.now().isoformat(),
-            'day': day,
-            'workout_name': workouts[day]['title'],
-            'completed_sets': completed_sets,
-            'total_sets': total_sets,
-            'completion_percentage': 100.0,
-            'exercises_completed': {}
+def save_state():
+    save_json(WORKOUT_DATA_FILE, st.session_state.workout_data)
+
+def set_done(day, ex_key, set_index, done):
+    st.session_state.workout_data.setdefault(day, {}).setdefault(ex_key, {})
+    slot = st.session_state.workout_data[day][ex_key].get(str(set_index), {"done": False, "weight": None, "reps": None, "rpe": None})
+    slot["done"] = done
+    st.session_state.workout_data[day][ex_key][str(set_index)] = slot
+    save_state()
+
+
+def set_set_detail(day, ex_key, set_index, field, value):
+    st.session_state.workout_data.setdefault(day, {}).setdefault(ex_key, {})
+    slot = st.session_state.workout_data[day][ex_key].get(str(set_index), {"done": False, "weight": None, "reps": None, "rpe": None})
+    slot[field] = value
+    st.session_state.workout_data[day][ex_key][str(set_index)] = slot
+    save_state()
+
+
+def ex_key_from(block_i, item_i):
+    return f"b{block_i}_i{item_i}"
+
+
+def compute_progress(day):
+    total_sets = 0
+    done_sets = 0
+    for b_i, block in enumerate(WORKOUT_TEMPLATES[day]["blocks"]):
+        for i_i, it in enumerate(block["items"]):
+            sets = it["sets"]
+            total_sets += sets
+            k = ex_key_from(b_i, i_i)
+            for s in range(sets):
+                if st.session_state.workout_data.get(day, {}).get(k, {}).get(str(s), {}).get("done"):
+                    done_sets += 1
+    pct = (done_sets / total_sets * 100) if total_sets else 0
+    return done_sets, total_sets, round(pct, 1)
+
+
+def progress_ring(pct):
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=pct,
+        number={'suffix': '%', 'font': {'size': 36}},
+        gauge={
+            'axis': {'range': [0, 100]},
+            'bar': {'thickness': 0.28},
+            'bgcolor': 'rgba(0,0,0,0)',
         }
-        
-        # Record individual exercise completion
-        for exercise in workouts[day]['exercises']:
-            exercise_id = exercise['id']
-            completed = get_exercise_completed_sets(day, exercise_id)
-            workout_entry['exercises_completed'][exercise['name']] = {
-                'completed_sets': completed,
-                'total_sets': exercise['sets'],
-                'completion_percentage': (completed / exercise['sets']) * 100
-            }
-        
-        st.session_state.workout_history.append(workout_entry)
-        save_workout_history(st.session_state.workout_history)
-        
-        # Reset the current workout
-        reset_workout(day)
-        
-        return True
-    return False
+    ))
+    fig.update_layout(height=200, margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(fig, use_container_width=True)
 
-def show_progress_analytics():
-    """Display workout history and analytics"""
-    st.markdown("## 📊 Progress Analytics")
-    
-    if not st.session_state.workout_history:
-        st.info("Complete some workouts to see your progress analytics!")
-        return
-    
-    # Convert history to DataFrame for analysis
-    df_history = pd.DataFrame(st.session_state.workout_history)
-    df_history['date'] = pd.to_datetime(df_history['date'])
-    df_history['week'] = df_history['date'].dt.isocalendar().week
-    df_history['month'] = df_history['date'].dt.to_period('M')
-    
-    # Summary metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>🏋️ Total Workouts</h3>
-            <h2>{}</h2>
-        </div>
-        """.format(len(df_history)), unsafe_allow_html=True)
-    
-    with col2:
-        total_sets = df_history['completed_sets'].sum()
-        st.markdown("""
-        <div class="metric-card">
-            <h3>💪 Total Sets</h3>
-            <h2>{}</h2>
-        </div>
-        """.format(total_sets), unsafe_allow_html=True)
-    
-    with col3:
-        avg_completion = df_history['completion_percentage'].mean()
-        st.markdown("""
-        <div class="metric-card">
-            <h3>📈 Avg Completion</h3>
-            <h2>{:.1f}%</h2>
-        </div>
-        """.format(avg_completion), unsafe_allow_html=True)
-    
-    with col4:
-        streak = calculate_current_streak()
-        st.markdown("""
-        <div class="metric-card">
-            <h3>🔥 Current Streak</h3>
-            <h2>{} days</h2>
-        </div>
-        """.format(streak), unsafe_allow_html=True)
-    
-    # Charts
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Workout frequency over time
-        weekly_counts = df_history.groupby(['week', 'day']).size().reset_index(name='count')
-        fig_freq = px.bar(weekly_counts, x='week', y='count', color='day',
-                         title="Weekly Workout Frequency",
-                         labels={'week': 'Week Number', 'count': 'Workouts Completed'})
-        st.plotly_chart(fig_freq, use_container_width=True)
-    
-    with col2:
-        # Completion percentage over time
-        fig_completion = px.line(df_history, x='date', y='completion_percentage', color='day',
-                               title="Workout Completion % Over Time",
-                               labels={'completion_percentage': 'Completion %'})
-        st.plotly_chart(fig_completion, use_container_width=True)
-    
-    # Exercise-specific progress
-    st.markdown("### 🎯 Exercise-Specific Progress")
-    
-    # Get all unique exercise names
-    all_exercises = set()
-    for workout in st.session_state.workout_history:
-        all_exercises.update(workout.get('exercises_completed', {}).keys())
-    
-    selected_exercise = st.selectbox("Select Exercise to Analyze", sorted(all_exercises))
-    
-    if selected_exercise:
-        exercise_data = []
-        for workout in st.session_state.workout_history:
-            if selected_exercise in workout.get('exercises_completed', {}):
-                exercise_info = workout['exercises_completed'][selected_exercise]
-                exercise_data.append({
-                    'date': pd.to_datetime(workout['date']),
-                    'completed_sets': exercise_info['completed_sets'],
-                    'total_sets': exercise_info['total_sets'],
-                    'completion_percentage': exercise_info['completion_percentage']
-                })
-        
-        if exercise_data:
-            df_exercise = pd.DataFrame(exercise_data)
-            
-            fig_exercise = go.Figure()
-            fig_exercise.add_trace(go.Scatter(
-                x=df_exercise['date'],
-                y=df_exercise['completed_sets'],
-                mode='lines+markers',
-                name='Sets Completed',
-                line=dict(color='#10b981', width=3)
-            ))
-            
-            fig_exercise.update_layout(
-                title=f"Progress: {selected_exercise}",
-                xaxis_title="Date",
-                yaxis_title="Sets Completed",
-                hovermode='x unified'
-            )
-            
-            st.plotly_chart(fig_exercise, use_container_width=True)
 
-def calculate_current_streak():
-    """Calculate current consecutive workout streak"""
-    if not st.session_state.workout_history:
-        return 0
-    
-    # Sort by date (most recent first)
-    sorted_history = sorted(st.session_state.workout_history, 
-                          key=lambda x: x['date'], reverse=True)
-    
-    streak = 0
-    current_date = datetime.now().date()
-    
-    for workout in sorted_history:
-        workout_date = pd.to_datetime(workout['date']).date()
-        days_diff = (current_date - workout_date).days
-        
-        if days_diff <= 2:  # Within 2 days counts as maintaining streak
-            streak += 1
-            current_date = workout_date
+def start_rest(seconds=90):
+    st.session_state.rest_timer_end = (datetime.utcnow() + timedelta(seconds=seconds)).isoformat()
+
+
+def rest_widget():
+    if st.session_state.rest_timer_end:
+        end = datetime.fromisoformat(st.session_state.rest_timer_end)
+        remaining = (end - datetime.utcnow()).total_seconds()
+        if remaining <= 0:
+            st.success("Rest done. Go! 💥")
+            st.session_state.rest_timer_end = None
         else:
-            break
-    
-    return streak
+            st.info(f"Rest: {int(remaining)}s remaining…")
+            st.experimental_rerun()
 
-def show_workout_history():
-    """Display workout history log"""
-    st.markdown("## 📅 Workout History")
-    
-    if not st.session_state.workout_history:
-        st.info("No workout history yet! Complete some workouts to see them here.")
-        return
-    
-    # Sort by date (most recent first)
-    sorted_history = sorted(st.session_state.workout_history, 
-                          key=lambda x: x['date'], reverse=True)
-    
-    for i, workout in enumerate(sorted_history[:20]):  # Show last 20 workouts
-        workout_date = pd.to_datetime(workout['date'])
-        
-        st.markdown(f"""
-        <div class="workout-history-item">
-            <h4>{workouts[workout['day']]['color']} {workout['workout_name']}</h4>
-            <p><strong>Date:</strong> {workout_date.strftime('%B %d, %Y at %I:%M %p')}</p>
-            <p><strong>Completion:</strong> {workout['completed_sets']}/{workout['total_sets']} sets ({workout['completion_percentage']:.1f}%)</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Show exercise breakdown in expander
-        with st.expander(f"Exercise Details - {workout_date.strftime('%m/%d/%Y')}"):
-            for exercise_name, details in workout.get('exercises_completed', {}).items():
-                completion_pct = details['completion_percentage']
-                color = "🟢" if completion_pct == 100 else "🟡" if completion_pct >= 50 else "🔴"
-                st.write(f"{color} **{exercise_name}**: {details['completed_sets']}/{details['total_sets']} sets ({completion_pct:.1f}%)")
+# --------------------------
+# Header
+# --------------------------
+st.markdown("""
+<h1 class='main-title'>🏃‍♂️ 10K Speed – Strength</h1>
+<p class='sub-title'>Mobile-optimised tracking for max strength, power, and elastic stiffness.</p>
+""", unsafe_allow_html=True)
 
-# Sidebar navigation
-with st.sidebar:
-    st.markdown("## 🎯 Navigation")
-    page = st.radio("Choose Page", ["🏋️ Current Workout", "📊 Progress Analytics", "📅 Workout History"])
+# --------------------------
+# Tabs
+# --------------------------
+main_tab, analytics_tab, history_tab, settings_tab = st.tabs([
+    "🏋️ Workout",
+    "📊 Analytics",
+    "📅 History",
+    "⚙️ Settings",
+])
 
-# Main app content based on page selection
-if page == "🏋️ Current Workout":
-    # Header
-    st.markdown("""
-    <div class="main-header">
-        <h1>💪 Workout Tracker</h1>
-        <p>Track your sets and get ripped!</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Day selector
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        selected_day = st.selectbox(
-            "Select Workout Day",
-            options=['tuesday', 'thursday'],
-            format_func=lambda x: f"{workouts[x]['color']} {workouts[x]['day']} - {workouts[x]['title']}",
-            index=0 if st.session_state.selected_day == 'tuesday' else 1,
-            key='day_selector'
-        )
-        st.session_state.selected_day = selected_day
-    
-    current_workout = workouts[selected_day]
-    completed_sets, total_sets = calculate_progress(selected_day)
-    progress_percentage = (completed_sets / total_sets) * 100 if total_sets > 0 else 0
-    
-    # Progress section
-    st.markdown(f"""
-    <div class="progress-container">
-        <h3>{current_workout['color']} {current_workout['title']}</h3>
-        <p><strong>{completed_sets}</strong> of <strong>{total_sets}</strong> sets completed</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Progress bar and buttons
-    col1, col2, col3 = st.columns([3, 1, 1])
-    with col1:
-        st.progress(progress_percentage / 100)
-        st.write(f"{progress_percentage:.0f}% complete")
-    with col2:
-        if st.button("🔄 Reset", help="Reset all sets for this workout"):
-            reset_workout(selected_day)
-            st.success("Workout reset!")
-    with col3:
-        if completed_sets == total_sets and total_sets > 0:
-            if st.button("✅ Complete", help="Save workout to history"):
-                if complete_workout(selected_day):
-                    st.success("Workout saved to history!")
-    
-    # Completion message
-    if completed_sets == total_sets and total_sets > 0:
-        st.markdown(f"""
-        <div class="completion-message">
-            <h2>🎉 Workout Complete!</h2>
-            <p>Great job finishing your {current_workout['day']} session!</p>
-            <p>Completed {completed_sets} sets total</p>
-            <p>Click "Complete" to save this workout to your history!</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.balloons()
-    
-    # Exercise list
-    st.markdown("---")
-    
-    for exercise in current_workout['exercises']:
-        exercise_id = exercise['id']
-        completed_sets_for_exercise = get_exercise_completed_sets(selected_day, exercise_id)
-        is_complete = completed_sets_for_exercise == exercise['sets']
-        
-        # Exercise card
-        card_class = "workout-card-completed" if is_complete else "workout-card"
-        
-        with st.container():
-            st.markdown(f"""
-            <div class="{card_class}">
-                <div class="exercise-header">
-                    {'✅' if is_complete else '⭕'} {exercise['name']}
-                    <span class="category-badge {get_category_class(exercise['category'])}">{exercise['category']}</span>
-                </div>
-                <div class="exercise-details">
-                    <strong>{exercise['sets']} sets × {exercise['reps']} reps</strong><br>
-                    {exercise['notes']}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Progress for this exercise
-            exercise_progress = (completed_sets_for_exercise / exercise['sets']) * 100 if exercise['sets'] > 0 else 0
-            st.progress(exercise_progress / 100)
-            st.write(f"{completed_sets_for_exercise}/{exercise['sets']} sets complete")
-            
-            # Set buttons
-            cols = st.columns(min(exercise['sets'], 6))  # Max 6 columns to prevent overflow
-            
-            for set_index in range(exercise['sets']):
-                col_index = set_index % 6  # Wrap to next row if more than 6 sets
-                if set_index >= 6 and set_index % 6 == 0:
-                    cols = st.columns(min(exercise['sets'] - set_index, 6))
-                
-                with cols[col_index]:
-                    is_completed = is_set_completed(selected_day, exercise_id, set_index)
-                    button_text = "✅" if is_completed else f"Set {set_index + 1}"
-                    button_type = "secondary" if is_completed else "primary"
-                    
-                    if st.button(
-                        button_text,
-                        key=f"{selected_day}_{exercise_id}_{set_index}",
-                        type=button_type,
-                        use_container_width=True
-                    ):
-                        toggle_set(selected_day, exercise_id, set_index)
-            
-            st.markdown("---")
+# --------------------------
+# Workout tab
+# --------------------------
+with main_tab:
+    col_day, col_prog = st.columns([1,1])
+    with col_day:
+        day = st.segmented_control("Day", options=["tuesday", "thursday"], default=st.session_state.selected_day, format_func=lambda d: f"{WORKOUT_TEMPLATES[d]['emoji']} {d.title()}")
+        st.session_state.selected_day = day
+    with col_prog:
+        done, total, pct = compute_progress(day)
+        progress_ring(pct)
+        st.caption(f"{done}/{total} sets complete")
 
-elif page == "📊 Progress Analytics":
-    show_progress_analytics()
+    # Render blocks
+    for b_i, block in enumerate(WORKOUT_TEMPLATES[day]["blocks"]):
+        st.subheader(block["name"])  # simple, readable sectioning
+        for i_i, it in enumerate(block["items"]):
+            k = ex_key_from(b_i, i_i)
+            # Determine completion
+            sets_map = st.session_state.workout_data.get(day, {}).get(k, {})
+            done_sets = sum(1 for s in range(it["sets"]) if sets_map.get(str(s), {}).get("done"))
+            is_done = done_sets == it["sets"]
 
-elif page == "📅 Workout History":
-    show_workout_history()
+            # Card
+            with st.container(border=True):
+                st.markdown(
+                    f"<div class='ex-card {'done' if is_done else ''}'>"
+                    f"<div style='display:flex; align-items:center; justify-content:space-between;'>"
+                    f"<div><strong>{'✅' if is_done else '⭕'} {it['name']}</strong>"
+                    f"<span class='badge {it['cat']}'>{it['cat']}</span></div>"
+                    f"<div style='font-size:12px; color:#64748b;'>{it['reps']}</div>"
+                    f"</div>"
+                    f"<div style='color:#64748b; margin:6px 0 10px 0;'>{it.get('note','')}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+                # Set chips (tap to toggle) + per-set detail
+                cols = st.columns(min(it["sets"], 6))
+                for s in range(it["sets"]):
+                    with cols[s % 6]:
+                        slot = sets_map.get(str(s), {"done": False, "weight": None, "reps": None, "rpe": None})
+                        label = f"Set {s+1}"
+                        if st.button(f"{'✅' if slot['done'] else label}", key=f"{day}_{k}_{s}"):
+                            set_done(day, k, s, not slot["done"])
+
+                with st.expander("Log load / RPE (optional)"):
+                    dcols = st.columns(3)
+                    for s in range(it["sets"]):
+                        slot = sets_map.get(str(s), {"done": False, "weight": None, "reps": None, "rpe": None})
+                        with dcols[s % 3]:
+                            w = st.number_input(f"Wgt (s{s+1})", min_value=0.0, value=float(slot["weight"]) if slot["weight"] is not None else 0.0, step=0.5, key=f"w_{day}_{k}_{s}")
+                            set_set_detail(day, k, s, "weight", w if w>0 else None)
+                            r = st.number_input(f"RPE (s{s+1})", min_value=0.0, max_value=10.0, value=float(slot["rpe"]) if slot["rpe"] is not None else 0.0, step=0.5, key=f"rpe_{day}_{k}_{s}")
+                            set_set_detail(day, k, s, "rpe", r if r>0 else None)
+
+                st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # Sticky actions
+    with st.container():
+        st.markdown("<div class='sticky-bar'>", unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns([1,1,1,1])
+        with c1:
+            if st.button("🔄 Reset Day"):
+                st.session_state.workout_data[day] = {}
+                save_state()
+                st.success("Reset – fresh start.")
+        with c2:
+            if st.button("⏱️ 90s Rest"):
+                start_rest(90)
+        with c3:
+            if st.button("⏱️ 2m Rest"):
+                start_rest(120)
+        with c4:
+            if st.button("✅ Save to History"):
+                d, t, p = compute_progress(day)
+                if t == 0:
+                    st.warning("No sets today yet.")
+                else:
+                    entry = {
+                        "date": datetime.utcnow().isoformat(),
+                        "day": day,
+                        "workout_name": WORKOUT_TEMPLATES[day]["title"],
+                        "completed_sets": d,
+                        "total_sets": t,
+                        "completion_percentage": p,
+                        "data": st.session_state.workout_data.get(day, {}),
+                    }
+                    st.session_state.history.append(entry)
+                    save_json(WORKOUT_HISTORY_FILE, st.session_state.history)
+                    # Clear the day after saving
+                    st.session_state.workout_data[day] = {}
+                    save_state()
+                    st.success("Saved to history.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Rest timer feedback
+    rest_widget()
+
+# --------------------------
+# Analytics tab
+# --------------------------
+with analytics_tab:
+    st.subheader("Weekly Output")
+    if len(st.session_state.history) == 0:
+        st.info("Complete and save a workout to see analytics.")
+    else:
+        df = pd.DataFrame(st.session_state.history)
+        df["date"] = pd.to_datetime(df["date"]) 
+        df["week"] = df["date"].dt.isocalendar().week
+        df["year"] = df["date"].dt.isocalendar().year
+
+        weekly = df.groupby(["year", "week", "day"], as_index=False)["completed_sets"].sum()
+        fig = go.Figure()
+        for day_name in weekly["day"].unique():
+            subset = weekly[weekly["day"] == day_name]
+            fig.add_trace(go.Bar(x=subset["week"].astype(str), y=subset["completed_sets"], name=day_name.title()))
+        fig.update_layout(barmode="group", title="Completed Sets per Week", xaxis_title="ISO Week", yaxis_title="Sets")
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("Completion % over Time")
+        comp = df.sort_values("date")
+        fig2 = go.Figure(go.Scatter(x=comp["date"], y=comp["completion_percentage"], mode="lines+markers"))
+        fig2.update_layout(yaxis_title="Completion %", xaxis_title="Date")
+        st.plotly_chart(fig2, use_container_width=True)
+
+# --------------------------
+# History tab
+# --------------------------
+with history_tab:
+    st.subheader("Recent Workouts")
+    if len(st.session_state.history) == 0:
+        st.info("No history yet.")
+    else:
+        for item in sorted(st.session_state.history, key=lambda x: x["date"], reverse=True)[:20]:
+            d = pd.to_datetime(item["date"]).strftime("%b %d, %Y – %H:%M")
+            st.markdown(
+                f"**{item['workout_name']}** ({item['day'].title()}) — {d}  "+
+                f"Completion: {item['completed_sets']}/{item['total_sets']} ({item['completion_percentage']}%)"
+            )
+            with st.expander("Details"):
+                st.json(item.get("data", {}))
+
+# --------------------------
+# Settings tab
+# --------------------------
+with settings_tab:
+    st.subheader("Data")
+    colA, colB = st.columns(2)
+    with colA:
+        if st.button("⬇️ Download History JSON"):
+            st.download_button(
+                label="Download history.json",
+                data=json.dumps(st.session_state.history, indent=2),
+                file_name="workout_history.json",
+                mime="application/json",
+            )
+    with colB:
+        if st.button("🗑️ Clear History"):
+            st.session_state.history = []
+            save_json(WORKOUT_HISTORY_FILE, [])
+            st.success("History cleared.")
+
+    st.divider()
+    st.caption("Schema v2 – per-set weight & RPE logging. Mobile-first UI with large tap targets, sticky actions, and rest timer.")
+
 
     
