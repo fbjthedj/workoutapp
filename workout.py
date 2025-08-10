@@ -25,6 +25,72 @@ WORKOUT_HISTORY_FILE = os.path.join(DATA_DIR, "workout_history.json")
 SCHEMA_VERSION = 3  # v3 adds: per-set fields + metadata + PRs
 
 # =============================================================
+# Compatibility helpers (Streamlit versions)
+# =============================================================
+
+def safe_rerun():
+    if hasattr(st, "rerun"):
+        st.rerun()
+    elif hasattr(st, "experimental_rerun"):
+        st.experimental_rerun()
+
+
+def ui_segmented(label, options, default, format_func=lambda x: x):
+    """Use segmented control if available; otherwise horizontal radio."""
+    if hasattr(st, "segmented_control"):
+        return st.segmented_control(label, options=options, default=default, format_func=format_func)
+    # Fallback to radio
+    idx = options.index(default) if default in options else 0
+    return st.radio(label, options, index=idx, format_func=format_func, horizontal=True)
+
+
+def ui_container_border():
+    """Placeholder for container with border — older Streamlit lacks border kw."""
+    # We return a normal container; visual border handled by our custom CSS in cards
+    return st.container()
+
+
+def safe_toast(msg: str):
+    if hasattr(st, "toast"):
+        st.toast(msg)
+    else:
+        st.info(msg)
+
+
+def get_query_param(key: str, default: str):
+    if hasattr(st, "query_params"):
+        try:
+            val = st.query_params.get(key)
+            return val if isinstance(val, str) else (val[0] if isinstance(val, list) and val else default)
+        except Exception:
+            return default
+    elif hasattr(st, "experimental_get_query_params"):
+        params = st.experimental_get_query_params()
+        val = params.get(key)
+        return val[0] if isinstance(val, list) and val else default
+    return default
+
+
+def set_query_param(key: str, value: str):
+    if hasattr(st, "query_params"):
+        try:
+            st.query_params[key] = value
+            return
+        except Exception:
+            pass
+    if hasattr(st, "experimental_set_query_params"):
+        try:
+            st.experimental_set_query_params(**{key: value})
+        except Exception:
+            pass
+
+
+def ui_toggle(label: str, value: bool):
+    if hasattr(st, "toggle"):
+        return st.toggle(label, value=value)
+    return st.checkbox(label, value=value)
+
+# =============================================================
 # Global styles (light/dark aware)
 # =============================================================
 st.markdown(
@@ -156,7 +222,7 @@ def save_json(path, data):
         with open(path, "w") as f:
             json.dump(data, f, indent=2)
     except Exception as e:
-        st.toast(f"Could not save {os.path.basename(path)}: {e}")
+        safe_toast(f"Could not save {os.path.basename(path)}: {e}")
 
 
 # =============================================================
@@ -169,7 +235,7 @@ if "workout_data" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = load_json(WORKOUT_HISTORY_FILE, [])
 if "selected_day" not in st.session_state:
-    st.session_state.selected_day = st.query_params.get("day", "tuesday")
+    st.session_state.selected_day = get_query_param("day", "tuesday")
 if "rest_timer_end" not in st.session_state:
     st.session_state.rest_timer_end = None
 if "workout_started_at" not in st.session_state:
@@ -271,7 +337,7 @@ def rest_widget():
             st.session_state.rest_timer_end = None
         else:
             st.info(f"Rest: {int(remaining)}s remaining…")
-            st.experimental_rerun()
+            safe_rerun()
 
 
 def elapsed_widget():
@@ -288,13 +354,11 @@ def build_last_values():
     last = {}
     for entry in sorted(st.session_state.history, key=lambda x: x.get("date", "")):
         data = entry.get("data", {})
-        # We also stored mapping from ex_key to name for that day in metadata (v3)
         name_map = entry.get("meta", {}).get("name_map", {})
         for ex_key, sets_map in data.items():
             ex_name = name_map.get(ex_key)
             if not ex_name:
                 continue
-            # Pull most recent non-null weight/RPE
             w_vals = [v.get("weight") for v in sets_map.values() if isinstance(v, dict) and v.get("weight")]
             r_vals = [v.get("rpe") for v in sets_map.values() if isinstance(v, dict) and v.get("rpe")]
             if w_vals or r_vals:
@@ -357,14 +421,14 @@ main_tab, analytics_tab, history_tab, settings_tab = st.tabs([
 with main_tab:
     col_day, col_prog = st.columns([1, 1])
     with col_day:
-        day = st.segmented_control(
+        day = ui_segmented(
             "Day",
             options=["tuesday", "thursday"],
             default=st.session_state.selected_day,
             format_func=lambda d: f"{WORKOUT_TEMPLATES[d]['emoji']} {d.title()}",
         )
         st.session_state.selected_day = day
-        st.query_params["day"] = day
+        set_query_param("day", day)
     with col_prog:
         done, total, pct = compute_progress(day)
         progress_ring(pct)
@@ -387,7 +451,7 @@ with main_tab:
             pr_html = f"<span class='badge pr'>PR {pr_weight:g}kg</span>" if pr_weight else ""
 
             # Card header
-            with st.container(border=True):
+            with ui_container_border():
                 st.markdown(
                     f"<div class='ex-card {'done' if is_done else ''}'>"
                     f"<div style='display:flex; align-items:center; justify-content:space-between;'>"
@@ -425,7 +489,6 @@ with main_tab:
                         if st.button(f"{'✅' if slot['done'] else label}", key=f"btn_{day}_{k}_{s}"):
                             set_done(day, k, s, not slot["done"])
                             if not slot["done"] and st.session_state.auto_rest:
-                                # Auto start rest after completing a set
                                 start_rest(int(st.session_state.auto_rest))
 
                 # Per-set logging — prefill with last values for this exercise name
@@ -467,7 +530,7 @@ with main_tab:
             if st.button("🔄 Reset Day"):
                 st.session_state.workout_data[day] = {}
                 save_state()
-                st.toast("Day reset.")
+                safe_toast("Day reset.")
         with c2:
             if st.button("⏱️ 90s Rest"):
                 start_rest(90)
@@ -496,12 +559,14 @@ with main_tab:
                     }
                     st.session_state.history.append(entry)
                     save_json(WORKOUT_HISTORY_FILE, st.session_state.history)
-                    # Clear current day and restart timer
                     st.session_state.workout_data[day] = {}
                     st.session_state.workout_started_at = datetime.utcnow().isoformat()
                     save_state()
-                    if st.session_state.confetti_on_save:
-                        st.balloons()
+                    try:
+                        if st.session_state.confetti_on_save:
+                            st.balloons()
+                    except Exception:
+                        pass
                     st.success("Saved to history.")
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -565,15 +630,13 @@ with history_tab:
                     st.json(item.get("data", {}))
             with c2:
                 if st.button("Duplicate as Today", key=f"dup_{item['date']}"):
-                    # load past metadata map to prefill current day with same set structure
                     name_map_prev = item.get("meta", {}).get("name_map", {})
                     prefill = {}
                     for ex_key, sets_map in item.get("data", {}).items():
-                        # create same number of empty sets
                         prefill[ex_key] = {s: {"done": False, "weight": None, "reps": None, "rpe": None} for s in sets_map.keys()}
                     st.session_state.workout_data[st.session_state.selected_day] = prefill
                     save_state()
-                    st.toast("Loaded past structure for today.")
+                    safe_toast("Loaded past structure for today.")
 
 # =============================================================
 # Settings tab
@@ -585,7 +648,7 @@ with settings_tab:
         st.session_state.auto_rest = st.number_input("Auto‑rest after set (seconds)", min_value=0, max_value=300, value=int(st.session_state.auto_rest), step=15)
         st.caption("Set to 0 to disable auto‑rest.")
     with col2:
-        st.session_state.confetti_on_save = st.toggle("🎉 Confetti on save", value=bool(st.session_state.confetti_on_save))
+        st.session_state.confetti_on_save = ui_toggle("🎉 Confetti on save", value=bool(st.session_state.confetti_on_save))
 
     st.divider()
     st.subheader("Data")
@@ -607,9 +670,10 @@ with settings_tab:
         if st.button("🧹 Clear Today", use_container_width=True):
             st.session_state.workout_data[st.session_state.selected_day] = {}
             save_state()
-            st.toast("Cleared today's sets.")
+            safe_toast("Cleared today's sets.")
 
     st.caption("Schema v3 – per‑set weight & RPE logging, metadata, PRs, elapsed timer, auto‑rest, and polished UI.")
+
 
 
 
