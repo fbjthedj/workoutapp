@@ -37,11 +37,14 @@ def safe_rerun():
 
 
 def ui_segmented(label, options, default, format_func=lambda x: x):
-    """Use segmented control if available; otherwise horizontal radio."""
+    """Use segmented control if available; otherwise horizontal radio.
+    Ensures `default` is a valid option to avoid StreamlitAPIException.
+    """
+    safe_default = default if (default in options) else (options[0] if options else None)
     if hasattr(st, "segmented_control"):
-        return st.segmented_control(label, options=options, default=default, format_func=format_func)
+        return st.segmented_control(label, options=options, default=safe_default, format_func=format_func)
     # Fallback to radio
-    idx = options.index(default) if default in options else 0
+    idx = options.index(safe_default) if (safe_default in options) else 0
     return st.radio(label, options, index=idx, format_func=format_func, horizontal=True)
 
 
@@ -756,3 +759,4 @@ with settings_tab:
             safe_toast("Cleared today's sets.")
 
     st.caption("Schema v4 – 3‑day split, 30‑min cap, deload toggle, progression tips, tendon stiffness focus.")
+
